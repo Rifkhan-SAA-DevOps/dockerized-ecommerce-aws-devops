@@ -21,3 +21,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
+
+
+# Why --host 0.0.0.0?
+# Vite normally listens only inside the container.
+# This makes Vite accessible from your browser through Docker port mapping.

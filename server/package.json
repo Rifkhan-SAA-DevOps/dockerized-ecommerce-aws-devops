@@ -21,6 +21,7 @@
     "slugify": "latest"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "nodemon": "latest"
   }
 }
