@@ -3,3 +3,9 @@ npm-debug.log
 .env
 .git
 .gitignore
+
+
+Dockerfile
+.dockerignore
+coverage
+.vscode
