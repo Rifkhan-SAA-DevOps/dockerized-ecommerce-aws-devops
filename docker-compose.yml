@@ -34,6 +34,11 @@ services:
     image: blog-backend
     container_name: blog-backend-container
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       mysql:
         condition: service_healthy
@@ -64,6 +69,11 @@ services:
     image: blog-frontend
     container_name: blog-frontend-container
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       backend:
         condition: service_healthy
