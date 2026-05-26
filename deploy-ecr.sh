@@ -1,20 +1,48 @@
+# #!/bin/bash
+
+# set -e
+
+# AWS_REGION="ap-south-1"
+# AWS_ACCOUNT_ID="654654143187"
+
+# echo "Logging in to Amazon ECR..."
+# aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+# echo "Pulling latest images from ECR..."
+# docker compose -f docker-compose.ecr.yml pull
+
+# echo "Restarting containers..."
+# docker compose -f docker-compose.ecr.yml up -d
+
+# echo "Checking containers..."
+# docker compose -f docker-compose.ecr.yml ps
+
+# echo "Deployment from ECR completed."
+
+
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 AWS_REGION="ap-south-1"
-AWS_ACCOUNT_ID="654654143187"
+AWS_ACCOUNT_ID="654684143157"
+ECR_REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Checking AWS identity..."
+aws sts get-caller-identity
 
 echo "Logging in to Amazon ECR..."
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+aws ecr get-login-password --region "$AWS_REGION" \
+  | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
 echo "Pulling latest images from ECR..."
 docker compose -f docker-compose.ecr.yml pull
 
 echo "Restarting containers..."
-docker compose -f docker-compose.ecr.yml up -d
+docker compose -f docker-compose.ecr.yml up -d --remove-orphans
 
-echo "Checking containers..."
+echo "Cleaning unused images..."
+docker image prune -f
+
+echo "Deployment completed."
 docker compose -f docker-compose.ecr.yml ps
-
-echo "Deployment from ECR completed."
