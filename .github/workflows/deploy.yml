@@ -64,7 +64,7 @@ jobs:
             git fetch origin main &&
             git reset --hard origin/main &&
             chmod +x deploy-ecr.sh &&
-            ./deploy-ecr.sh
+            ./deploy-ecr.sh "
 
       # - name: Deploy on EC2
       #   run: |
