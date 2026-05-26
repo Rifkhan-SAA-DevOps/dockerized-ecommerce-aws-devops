@@ -3,7 +3,7 @@ name: Deploy Fullstack Docker App to EC2
 on:
   push:
     branches:
-      - dockerized-aws-devops
+      - main
 
   workflow_dispatch:
 
