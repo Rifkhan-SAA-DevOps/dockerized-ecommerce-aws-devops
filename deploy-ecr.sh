@@ -25,7 +25,8 @@
 set -euo pipefail
 
 AWS_REGION="ap-south-1"
-AWS_ACCOUNT_ID="654684143157"
+AWS_ACCOUNT_ID="654654143187"
+
 ECR_REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
 echo "Checking AWS identity..."
