@@ -20,7 +20,7 @@
 # echo "Deployment from ECR completed."
 
 
-#!/bin/bash
+# !/bin/bash
 
 set -euo pipefail
 
