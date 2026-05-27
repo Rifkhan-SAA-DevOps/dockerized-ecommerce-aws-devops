@@ -12,19 +12,19 @@ echo "Logging in to Amazon ECR..."
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
 echo "Building backend image..."
-docker build -t blog-backend ./server
+docker build -t backend ./server
 
 echo "Tagging backend image..."
-docker tag blog-backend:latest $BACKEND_REPO:latest
+docker tag backend:latest $BACKEND_REPO:latest
 
 echo "Pushing backend image..."
 docker push $BACKEND_REPO:latest
 
 echo "Building frontend image..."
-docker build -t blog-frontend ./client
+docker build -t frontend ./client
 
 echo "Tagging frontend image..."
-docker tag blog-frontend:latest $FRONTEND_REPO:latest
+docker tag frontend:latest $FRONTEND_REPO:latest
 
 echo "Pushing frontend image..."
 docker push $FRONTEND_REPO:latest
