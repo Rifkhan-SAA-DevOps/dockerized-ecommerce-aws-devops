@@ -89,8 +89,8 @@ env:
   FRONTEND_ECR_REPOSITORY: frontend
   BACKEND_ECR_REPOSITORY: backend
 
-  FRONTEND_ASG_NAME: blog-prod-frontend-asg
-  BACKEND_ASG_NAME: blog-prod-backend-asg
+  FRONTEND_ASG_NAME: docker-prod-frontend-asg
+  BACKEND_ASG_NAME: docker-prod-asg
 
 jobs:
   detect-changes:
