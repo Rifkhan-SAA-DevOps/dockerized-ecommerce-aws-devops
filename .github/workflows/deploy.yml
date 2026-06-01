@@ -89,12 +89,36 @@ env:
   FRONTEND_ECR_REPOSITORY: frontend
   BACKEND_ECR_REPOSITORY: backend
 
-  FRONTEND_ASG_NAME: docker-prod-web-asg
-  BACKEND_ASG_NAME: docker-prod-asg
+  FRONTEND_ASG_NAME: blog-prod-frontend-asg
+  BACKEND_ASG_NAME: blog-prod-backend-asg
 
 jobs:
-  build-and-deploy:
-    name: Build, Push to ECR, and Refresh ASG
+  detect-changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'client/**'
+            backend:
+              - 'server/**'
+
+  deploy-frontend:
+    name: Build and Deploy Frontend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -115,7 +139,53 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set image tags
-        id: vars
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA \
+            ./client
+
+      - name: Push frontend Docker image
+        run: |
+          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA
+
+      - name: Refresh frontend Auto Scaling Group
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name $FRONTEND_ASG_NAME \
+            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
+
+  deploy-backend:
+    name: Build and Deploy Backend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
         run: |
           SHORT_SHA=${GITHUB_SHA::7}
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
@@ -133,26 +203,8 @@ jobs:
           docker push $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$SHORT_SHA
 
-      - name: Build frontend Docker image
-        run: |
-          docker build \
-            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest \
-            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA \
-            ./client
-
-      - name: Push frontend Docker image
-        run: |
-          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA
-
       - name: Refresh backend Auto Scaling Group
         run: |
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name $BACKEND_ASG_NAME \
-            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
-
-      - name: Refresh frontend Auto Scaling Group
-        run: |
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name $FRONTEND_ASG_NAME \
             --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
