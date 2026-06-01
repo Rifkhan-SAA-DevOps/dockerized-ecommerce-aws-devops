@@ -3,7 +3,7 @@ name: Deploy Fullstack Docker App to EC2
 on:
   push:
     branches:
-      - main
+      - aws-production-asg-alb
   workflow_dispatch:
 
 env:
