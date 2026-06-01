@@ -89,7 +89,7 @@ env:
   FRONTEND_ECR_REPOSITORY: frontend
   BACKEND_ECR_REPOSITORY: backend
 
-  FRONTEND_ASG_NAME: docker-prod-frontend-asg
+  FRONTEND_ASG_NAME: docker-prod-web-asg
   BACKEND_ASG_NAME: docker-prod-asg
 
 jobs:
