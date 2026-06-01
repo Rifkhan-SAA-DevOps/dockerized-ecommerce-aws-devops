@@ -1,38 +1,38 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: blog-mysql-container
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-    ports:
-      - "3307:3306"
-    volumes:
-      - blog-mysql-data:/var/lib/mysql
-      - ./mysql-init:/docker-entrypoint-initdb.d
-    networks:
-      - blog-network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-p${MYSQL_ROOT_PASSWORD}",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: blog-mysql-container
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  #     MYSQL_DATABASE: ${MYSQL_DATABASE}
+  #   ports:
+  #     - "3307:3306"
+  #   volumes:
+  #     - blog-mysql-data:/var/lib/mysql
+  #     - ./mysql-init:/docker-entrypoint-initdb.d
+  #   networks:
+  #     - blog-network
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD",
+  #         "mysqladmin",
+  #         "ping",
+  #         "-h",
+  #         "localhost",
+  #         "-p${MYSQL_ROOT_PASSWORD}",
+  #       ]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   backend:
     build:
       context: ./server
       dockerfile: Dockerfile
-    image: blog-backend
-    container_name: blog-backend-container
+    image: backend
+    container_name: backend-container
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -66,8 +66,8 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-    image: blog-frontend
-    container_name: blog-frontend-container
+    image: frontend
+    container_name: frontend-container
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -82,8 +82,8 @@ services:
     networks:
       - blog-network
 
-volumes:
-  blog-mysql-data:
+# volumes:
+#   blog-mysql-data:
 
 networks:
   blog-network:
