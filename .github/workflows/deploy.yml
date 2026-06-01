@@ -11,8 +11,8 @@
 #   AWS_REGION: ${{ secrets.AWS_REGION }}
 #   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
 #   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-#   BACKEND_REPOSITORY: blog-backend
-#   FRONTEND_REPOSITORY: blog-frontend
+#   BACKEND_REPOSITORY: backend
+#   FRONTEND_REPOSITORY: frontend
 
 # jobs:
 #   build-push-deploy:
@@ -72,3 +72,87 @@
 #       #   run: |
 #       #     curl -f ${{ secrets.APP_URL }} || exit 1
 #       #     curl -f ${{ secrets.APP_URL }}/api/health || exit 1
+
+# below is container in same ec2
+
+name: Build and Deploy Docker App to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "654654143187"
+
+  FRONTEND_ECR_REPOSITORY: frontend
+  BACKEND_ECR_REPOSITORY: backend
+
+  FRONTEND_ASG_NAME: docker-prod-web-asg
+  BACKEND_ASG_NAME: docker-prod-asg
+
+jobs:
+  build-and-deploy:
+    name: Build, Push to ECR, and Refresh ASG
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        id: vars
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+
+      - name: Build backend Docker image
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$SHORT_SHA \
+            ./server
+
+      - name: Push backend Docker image
+        run: |
+          docker push $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$SHORT_SHA
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA \
+            ./client
+
+      - name: Push frontend Docker image
+        run: |
+          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA
+
+      - name: Refresh backend Auto Scaling Group
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name $BACKEND_ASG_NAME \
+            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
+
+      - name: Refresh frontend Auto Scaling Group
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name $FRONTEND_ASG_NAME \
+            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
