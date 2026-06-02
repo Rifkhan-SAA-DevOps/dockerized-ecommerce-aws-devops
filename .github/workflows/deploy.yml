@@ -75,7 +75,6 @@
 
 # below is container in same ec2
 
-
 name: Deploy Blog 3-Tier Docker App to AWS
 
 on:
@@ -116,10 +115,8 @@ jobs:
           filters: |
             frontend:
               - 'client/**'
-              - '.github/workflows/deploy.yml'
             backend:
               - 'server/**'
-              - '.github/workflows/deploy.yml'
 
   deploy-frontend:
     name: Build, Push, and Deploy Frontend
@@ -134,8 +131,8 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-            role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-            aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login Docker to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -143,35 +140,34 @@ jobs:
       - name: Get AWS Account ID
         id: aws-account
         run: |
-            echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+          echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
 
       - name: Set frontend image URI
         id: image
         run: |
-            ACCOUNT_ID=${{ steps.aws-account.outputs.account_id }}
-            FRONTEND_IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.FRONTEND_ECR_REPO }}
-            echo "frontend_image=$FRONTEND_IMAGE" >> "$GITHUB_OUTPUT"
+          ACCOUNT_ID=${{ steps.aws-account.outputs.account_id }}
+          FRONTEND_IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.FRONTEND_ECR_REPO }}
+          echo "frontend_image=$FRONTEND_IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Build frontend Docker image
         run: |
-            docker build \
-                --build-arg VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }} \
-                -t ${{ steps.image.outputs.frontend_image }}:latest \
-                -t ${{ steps.image.outputs.frontend_image }}:${{ github.sha }} \
-                ./client
+          docker build \
+            --build-arg VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }} \
+            -t ${{ steps.image.outputs.frontend_image }}:latest \
+            -t ${{ steps.image.outputs.frontend_image }}:${{ github.sha }} \
+            ./client
 
       - name: Push frontend image to ECR
         run: |
-            docker push ${{ steps.image.outputs.frontend_image }}:latest
-            docker push ${{ steps.image.outputs.frontend_image }}:${{ github.sha }}
+          docker push ${{ steps.image.outputs.frontend_image }}:latest
+          docker push ${{ steps.image.outputs.frontend_image }}:${{ github.sha }}
 
       - name: Start frontend ASG instance refresh
         run: |
-            aws autoscaling start-instance-refresh \
-                --auto-scaling-group-name ${{ env.FRONTEND_ASG_NAME }} \
-                --preferences MinHealthyPercentage=50,InstanceWarmup=300 \
-                --region ${{ env.AWS_REGION }}
-
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name ${{ env.FRONTEND_ASG_NAME }} \
+            --preferences MinHealthyPercentage=50,InstanceWarmup=300 \
+            --region ${{ env.AWS_REGION }}
 
   deploy-backend:
     name: Build, Push, and Deploy Backend
