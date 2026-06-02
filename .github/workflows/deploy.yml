@@ -140,6 +140,11 @@ jobs:
           echo "backend=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Print detected changes
+        run: |
+          echo "frontend=${{ steps.detect.outputs.frontend }}"
+          echo "backend=${{ steps.detect.outputs.backend }}"
+
   deploy-frontend:
     name: Build, Push, and Deploy Frontend
     runs-on: ubuntu-latest
