@@ -25,3 +25,12 @@ logs/
 .DS_Store
 .vscode/
 .idea/
+
+
+node_modules
+.env
+.env.local
+.env.production
+dist
+build
+.DS_Store

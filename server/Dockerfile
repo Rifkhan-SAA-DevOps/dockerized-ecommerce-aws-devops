@@ -9,6 +9,7 @@ RUN apk add --no-cache wget
 COPY package*.json ./
 
 RUN npm ci --omit=dev 
+# RUN npm ci --only=production
 # RUN npm ci --omit=dev #Because npm ci installs exactly from package-lock.json, so builds are more predictable
 # Installs only production dependencies
 # RUN npm install

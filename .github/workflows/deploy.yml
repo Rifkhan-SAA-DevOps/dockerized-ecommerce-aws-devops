@@ -75,26 +75,30 @@
 
 # below is container in same ec2
 
-name: Build and Deploy Docker App to AWS
+
+name: Deploy Blog 3-Tier Docker App to AWS
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 env:
   AWS_REGION: ap-south-1
-  AWS_ACCOUNT_ID: "654654143187"
-
-  FRONTEND_ECR_REPOSITORY: frontend
-  BACKEND_ECR_REPOSITORY: backend
-
-  FRONTEND_ASG_NAME: docker-prod-web-asg
-  BACKEND_ASG_NAME: docker-prod-asg
+  FRONTEND_ECR_REPO: frontend
+  BACKEND_ECR_REPO: backend
+  FRONTEND_ASG_NAME: docker-frontend-asg
+  BACKEND_ASG_NAME: docker-backend-asg
+  VITE_API_BASE_URL: /api
 
 jobs:
   detect-changes:
-    name: Detect changed services
+    name: Detect changed application folders
     runs-on: ubuntu-latest
 
     outputs:
@@ -105,25 +109,23 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Detect changed paths
+      - name: Detect frontend/backend changes
         id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
             frontend:
               - 'client/**'
+              - '.github/workflows/deploy.yml'
             backend:
               - 'server/**'
+              - '.github/workflows/deploy.yml'
 
   deploy-frontend:
-    name: Build and Deploy Frontend
-    needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+    name: Build, Push, and Deploy Frontend
     runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write
-      contents: read
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
 
     steps:
       - name: Checkout source code
@@ -132,45 +134,50 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+            role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+            aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Login Docker to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tags
+      - name: Get AWS Account ID
+        id: aws-account
         run: |
-          SHORT_SHA=${GITHUB_SHA::7}
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          echo "ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+            echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+
+      - name: Set frontend image URI
+        id: image
+        run: |
+            ACCOUNT_ID=${{ steps.aws-account.outputs.account_id }}
+            FRONTEND_IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.FRONTEND_ECR_REPO }}
+            echo "frontend_image=$FRONTEND_IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Build frontend Docker image
         run: |
-          docker build \
-            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest \
-            -t $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA \
-            ./client
+            docker build \
+                --build-arg VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }} \
+                -t ${{ steps.image.outputs.frontend_image }}:latest \
+                -t ${{ steps.image.outputs.frontend_image }}:${{ github.sha }} \
+                ./client
 
-      - name: Push frontend Docker image
+      - name: Push frontend image to ECR
         run: |
-          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$SHORT_SHA
+            docker push ${{ steps.image.outputs.frontend_image }}:latest
+            docker push ${{ steps.image.outputs.frontend_image }}:${{ github.sha }}
 
-      - name: Refresh frontend Auto Scaling Group
+      - name: Start frontend ASG instance refresh
         run: |
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name $FRONTEND_ASG_NAME \
-            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
+            aws autoscaling start-instance-refresh \
+                --auto-scaling-group-name ${{ env.FRONTEND_ASG_NAME }} \
+                --preferences MinHealthyPercentage=50,InstanceWarmup=300 \
+                --region ${{ env.AWS_REGION }}
+
 
   deploy-backend:
-    name: Build and Deploy Backend
-    needs: detect-changes
-    if: needs.detect-changes.outputs.backend == 'true'
+    name: Build, Push, and Deploy Backend
     runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write
-      contents: read
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.backend == 'true' }}
 
     steps:
       - name: Checkout source code
@@ -179,32 +186,39 @@ jobs:
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Login Docker to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tags
+      - name: Get AWS Account ID
+        id: aws-account
         run: |
-          SHORT_SHA=${GITHUB_SHA::7}
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          echo "ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+          echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+
+      - name: Set backend image URI
+        id: image
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.account_id }}
+          BACKEND_IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_ECR_REPO }}
+          echo "backend_image=$BACKEND_IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Build backend Docker image
         run: |
           docker build \
-            -t $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest \
-            -t $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$SHORT_SHA \
+            -t ${{ steps.image.outputs.backend_image }}:latest \
+            -t ${{ steps.image.outputs.backend_image }}:${{ github.sha }} \
             ./server
 
-      - name: Push backend Docker image
+      - name: Push backend image to ECR
         run: |
-          docker push $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$SHORT_SHA
+          docker push ${{ steps.image.outputs.backend_image }}:latest
+          docker push ${{ steps.image.outputs.backend_image }}:${{ github.sha }}
 
-      - name: Refresh backend Auto Scaling Group
+      - name: Start backend ASG instance refresh
         run: |
           aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name $BACKEND_ASG_NAME \
-            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":300}'
+            --auto-scaling-group-name ${{ env.BACKEND_ASG_NAME }} \
+            --preferences MinHealthyPercentage=50,InstanceWarmup=300 \
+            --region ${{ env.AWS_REGION }}

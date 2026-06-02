@@ -1,0 +1,65 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  FRONTEND_ECR_REPO: blog-frontend
+  BACKEND_ECR_REPO: blog-backend
+  VITE_API_BASE_URL: /api
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::YOUR_ACCOUNT_ID:role/GitHubActionsDeployRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
+
+      - name: Build and push frontend image
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.account_id }}
+          FRONTEND_IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.FRONTEND_ECR_REPO }}
+
+          docker build \
+            --build-arg VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }} \
+            -t $FRONTEND_IMAGE:latest \
+            -t $FRONTEND_IMAGE:${{ github.sha }} \
+            ./frontend
+
+          docker push $FRONTEND_IMAGE:latest
+          docker push $FRONTEND_IMAGE:${{ github.sha }}
+
+      - name: Build and push backend image
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.account_id }}
+          BACKEND_IMAGE=$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_ECR_REPO }}
+
+          docker build \
+            -t $BACKEND_IMAGE:latest \
+            -t $BACKEND_IMAGE:${{ github.sha }} \
+            ./backend
+
+          docker push $BACKEND_IMAGE:latest
+          docker push $BACKEND_IMAGE:${{ github.sha }}
