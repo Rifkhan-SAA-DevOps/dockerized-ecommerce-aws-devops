@@ -101,12 +101,14 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
-      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+      backend: ${{ steps.detect.outputs.backend }}
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Detect changed files
         id: detect
@@ -114,21 +116,28 @@ jobs:
           echo "Before SHA: ${{ github.event.before }}"
           echo "Current SHA: ${{ github.sha }}"
 
+          git fetch --all --prune
+
+          if git cat-file -e "${{ github.event.before }}^{commit}"; then
           CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          else
+          echo "Before SHA not found. Using previous commit fallback."
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
 
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
           if echo "$CHANGED_FILES" | grep -q '^client/'; then
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
-            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          echo "frontend=false" >> "$GITHUB_OUTPUT"
           fi
 
           if echo "$CHANGED_FILES" | grep -q '^server/'; then
-            echo "backend=true" >> "$GITHUB_OUTPUT"
+          echo "backend=true" >> "$GITHUB_OUTPUT"
           else
-            echo "backend=false" >> "$GITHUB_OUTPUT"
+          echo "backend=false" >> "$GITHUB_OUTPUT"
           fi
 
   deploy-frontend:
