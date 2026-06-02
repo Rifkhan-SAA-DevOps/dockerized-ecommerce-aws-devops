@@ -10,6 +10,7 @@ async function startServer() {
   try {
     await testDbConnection();
     console.log("✅ MySQL connected");
+    console.log("✅ CI/CD checking");
 
     app.listen(PORT, "0.0.0.0", () => {   // This 0.0.0.0 is important inside Docker.
       console.log(`🚀 API running on http://localhost:${PORT}`);
