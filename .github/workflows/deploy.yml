@@ -117,6 +117,10 @@ jobs:
               - 'client/**'
             backend:
               - 'server/**'
+      - name: Print detected changes
+        run: |
+            echo "frontend=${{ steps.filter.outputs.frontend }}"
+            echo "backend=${{ steps.filter.outputs.backend }}"
 
   deploy-frontend:
     name: Build, Push, and Deploy Frontend
