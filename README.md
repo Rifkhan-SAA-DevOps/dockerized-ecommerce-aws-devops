@@ -514,7 +514,7 @@ This keeps secrets outside:
 
 ### ACM Certificates
 
-![Route53](./docs/images/docker-certificates.png)
+![ACM Certificates](./docs/images/docker-certificates.png)
 
 ### Route53
 
