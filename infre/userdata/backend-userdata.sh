@@ -17,6 +17,8 @@ dnf install -y docker awscli
 systemctl enable docker
 systemctl start docker
 
+dnf install -y amazon-cloudwatch-agent
+
 echo "Reading parameters from SSM Parameter Store..."
 
 ACCOUNT_ID=$(aws ssm get-parameter --name "account_id" --with-decryption --query "Parameter.Value" --output text --region $REGION)
